@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a12">
+<title>搬砖进度条</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a12;--txt:#f4f5fa;--dim:#8b8fa3;
+  --gold1:#ffe066;--gold2:#ff8a00;
+  --purple:#7c5cff;--cyan:#22d3ee;
+}
+html,body{min-height:100%}
+body{
+  background:var(--bg);color:var(--txt);
+  font-family:system-ui,-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  display:flex;justify-content:center;
+  padding:max(18px,env(safe-area-inset-top)) 14px 40px;
+  overflow-x:hidden;-webkit-font-smoothing:antialiased;
+  -webkit-tap-highlight-color:transparent;
+}
+body::before,body::after{
+  content:'';position:fixed;border-radius:50%;filter:blur(80px);
+  pointer-events:none;z-index:0;
+}
+body::before{width:70vw;height:70vw;background:rgba(124,92,255,.45);top:-25vw;left:-25vw}
+body::after{width:65vw;height:65vw;background:rgba(34,211,238,.26);bottom:-25vw;right:-25vw}
+
+.app{width:100%;max-width:440px;position:relative;z-index:1}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:2px 6px 14px}
+.date{font-size:13px;color:var(--dim);letter-spacing:.02em}
+.gear{
+  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);
+  color:var(--txt);width:38px;height:38px;border-radius:13px;font-size:17px;
+  cursor:pointer;display:grid;place-items:center;transition:transform .15s;
+}
+.gear:active{transform:scale(.9)}
+
+.card{
+  background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.028));
+  border:1px solid rgba(255,255,255,.1);border-radius:26px;
+  padding:22px 20px 20px;
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  box-shadow:0 20px 50px -20px rgba(0,0,0,.85);
+  transition:box-shadow .5s;
+}
+.card.flash{box-shadow:0 0 0 2px rgba(255,224,102,.55),0 20px 60px -18px rgba(255,138,0,.55)}
+
+.pill{
+  display:inline-flex;align-items:center;gap:7px;font-size:12px;
+  padding:5px 12px;border-radius:999px;
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);color:#c9ccdb;
+}
+.pill .dot{width:6px;height:6px;border-radius:50%;background:#4ade80;box-shadow:0 0 8px #4ade80;animation:pulse 1.6s infinite}
+.pill.off .dot{background:#8b8fa3;box-shadow:none;animation:none}
+.pill.done .dot{background:#ffe066;box-shadow:0 0 8px #ffe066;animation:none}
+@keyframes pulse{50%{opacity:.3}}
+
+.label{font-size:12px;color:var(--dim);margin:18px 0 2px;letter-spacing:.1em}
+.amount{
+  font-size:clamp(2.6rem,13.5vw,3.5rem);font-weight:800;line-height:1.05;
+  letter-spacing:-.03em;font-variant-numeric:tabular-nums;
+  background:linear-gradient(100deg,var(--gold1),var(--gold2) 72%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 6px 18px rgba(255,138,0,.22));
+}
+.amount .cur{font-size:.46em;font-weight:700;margin-right:2px;vertical-align:.22em}
+.per{font-size:12.5px;color:var(--dim);margin-top:8px}
+.per b{color:var(--gold1);font-variant-numeric:tabular-nums}
+
+.mood{
+  display:flex;align-items:center;gap:12px;margin:20px 0 18px;
+  padding:12px 14px;border-radius:16px;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);
+}
+.mood .emo{font-size:30px;line-height:1;animation:bob 2.6s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-5px) rotate(-7deg)}}
+.mood .txt{font-size:13.5px;color:#cfd2e0;line-height:1.45}
+
+.bar{
+  position:relative;height:18px;border-radius:999px;
+  background:rgba(255,255,255,.07);overflow:hidden;
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.55);
+}
+.bar-fill{
+  height:100%;width:0;border-radius:999px;position:relative;overflow:hidden;
+  background:linear-gradient(90deg,#7c5cff,#22d3ee 48%,#ffd93d);
+  transition:width .3s linear;
+}
+.bar-fill::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(100deg,transparent 20%,rgba(255,255,255,.5) 50%,transparent 80%);
+  background-size:220% 100%;animation:shine 2.2s linear infinite;
+}
+@keyframes shine{from{background-position:220% 0}to{background-position:-120% 0}}
+.marks{position:absolute;inset:0;pointer-events:none}
+.marks i{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.22)}
+
+.bar-meta{display:flex;justify-content:space-between;margin-top:9px;font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+.bar-meta b{color:#e8eaf2;font-weight:600}
+
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:18px}
+.stat{
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);
+  border-radius:15px;padding:11px 8px;text-align:center;
+}
+.stat .k{display:block;font-size:11px;color:var(--dim);margin-bottom:5px}
+.stat .v{display:block;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+
+.foot{text-align:center;font-size:11.5px;color:#5b5f72;margin-top:16px}
+
+/* 彩带 */
+.confetti{
+  position:fixed;top:-18px;width:9px;height:13px;border-radius:2px;
+  z-index:999;pointer-events:none;
+  animation:fall 2.4s cubic-bezier(.3,.7,.5,1) forwards;
+}
+@keyframes fall{
+  0%{transform:translate3d(0,0,0) rotate(0);opacity:1}
+  100%{transform:translate3d(var(--x),110vh,0) rotate(var(--r));opacity:0}
+}
+
+/* 设置面板 */
+.modal{
+  position:fixed;inset:0;background:rgba(5,5,12,.75);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  z-index:200;display:flex;align-items:center;justify-content:center;padding:18px;
+}
+.modal[hidden]{display:none}
+.sheet{
+  width:100%;max-width:380px;background:#15151f;
+  border:1px solid rgba(255,255,255,.1);border-radius:22px;
+  padding:22px;max-height:88vh;overflow-y:auto;
+  animation:pop .22s ease-out;
+}
+@keyframes pop{from{transform:scale(.94);opacity:0}to{transform:scale(1);opacity:1}}
+.sheet h2{font-size:17px;margin-bottom:6px}
+.sheet p.tip{font-size:12px;color:var(--dim);margin-bottom:10px}
+.field{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:11px 0;border-bottom:1px solid rgba(255,255,255,.07);
+}
+.field label{font-size:13.5px;color:#cfd2e0}
+.field input[type=number],.field input[type=time]{
+  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);
+  border-radius:10px;color:var(--txt);padding:8px 10px;font-size:14px;
+  font-family:inherit;width:132px;text-align:right;outline:none;transition:border-color .2s;
+}
+.field input:focus{border-color:var(--purple)}
+.field input:disabled{opacity:.35}
+.field input[type=checkbox]{width:20px;height:20px;accent-color:#7c5cff;cursor:pointer}
+.actions{display:flex;gap:10px;margin-top:20px}
+.btn{
+  flex:1;padding:13px;border-radius:14px;border:none;font-size:14.5px;
+  font-weight:600;font-family:inherit;cursor:pointer;transition:transform .15s;
+}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:linear-gradient(100deg,var(--purple),#5b8cff);color:#fff}
+.btn.ghost{background:rgba(255,255,255,.08);color:var(--txt)}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="topbar">
+    <div class="date" id="dateText">—</div>
+    <button class="gear" id="gearBtn" aria-label="设置">⚙️</button>
+  </div>
+
+  <main class="card" id="mainCard">
+    <div class="pill" id="pill"><span class="dot"></span><span id="pillText">搬砖中</span></div>
+
+    <div class="label">今日已入账</div>
+    <div class="amount"><span class="cur">¥</span><span id="money">0.00</span></div>
+    <div class="per">每秒进账 <b id="perSec">¥0.0000</b> ・ 今日目标 <b id="dayPay">¥0.00</b></div>
+
+    <div class="mood">
+      <div class="emo" id="emoji">🌅</div>
+      <div class="txt" id="quip">新的一天，从一杯水开始</div>
+    </div>
+
+    <div class="bar">
+      <div class="bar-fill" id="barFill"></div>
+      <div class="marks">
+        <i style="left:25%"></i><i style="left:50%"></i><i style="left:75%"></i>
+      </div>
+    </div>
+    <div class="bar-meta">
+      <span>进度 <b id="pct">0%</b></span>
+      <span id="leftText">还剩 0小时0分</span>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><span class="k">距下班</span><span class="v" id="countdown">--:--:--</span></div>
+      <div class="stat"><span class="k">已工作</span><span class="v" id="worked">0m</span></div>
+      <div class="stat"><span class="k">还差</span><span class="v" id="remainMoney">¥0</span></div>
+    </div>
+  </main>
+
+  <div class="foot">数据仅存在本机浏览器 ・ 点右上角 ⚙️ 改工资</div>
+</div>
+
+<!-- 设置面板 -->
+<div class="modal" id="modal" hidden>
+  <div class="sheet">
+    <h2>设置</h2>
+    <p class="tip">改完保存，进度条立刻重算</p>
+
+    <div class="field"><label>月薪（元）</label><input type="number" id="cfgSalary" min="0" step="100"></div>
+    <div class="field"><label>每月工作日</label><input type="number" id="cfgDays" min="1" max="31" step="0.5"></div>
+    <div class="field"><label>上班时间</label><input type="time" id="cfgStart"></div>
+    <div class="field"><label>下班时间</label><input type="time" id="cfgEnd"></div>
+    <div class="field"><label>有午休</label><input type="checkbox" id="cfgLunch"></div>
+    <div class="field"><label>午休开始</label><input type="time" id="cfgLunchStart"></div>
+    <div class="field"><label>午休结束</label><input type="time" id="cfgLunchEnd"></div>
+
+    <div class="actions">
+      <button class="btn ghost" id="closeBtn">取消</button>
+      <button class="btn primary" id="saveBtn">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  var CFG_KEY  = 'brick.cfg.v1';
+  var MARK_KEY = 'brick.marks.v1';
+
+  var DEFAULTS = {
+    salary: 12000,
+    workDays: 21.75,
+    start: '09:00',
+    end: '18:00',
+    useLunch: true,
+    lunchStart: '12:00',
+    lunchEnd: '13:00'
+  };
+
+  /* ---------- 工具 ---------- */
+  function toMin(t){
+    var p = String(t || '0:0').split(':');
+    return (Number(p[0]) || 0) * 60 + (Number(p[1]) || 0);
+  }
+  function todayKey(){
+    var d = new Date();
+    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+  }
+  function fmtMoney(n){
+    var s = n.toFixed(2), parts = s.split('.');
+    return parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + parts[1];
+  }
+  function hms(sec){
+    sec = Math.max(0, Math.floor(sec));
+    var h = Math.floor(sec / 3600),
+        m = Math.floor(sec % 3600 / 60),
+        s = sec % 60;
+    return [h, m, s].map(function(v){ return String(v).padStart(2, '0'); }).join(':');
+  }
+  function hm(sec){
+    var t = Math.max(0, Math.floor(sec)),
+        h = Math.floor(t / 3600),
+        m = Math.floor(t % 3600 / 60);
+    return h > 0 ? h + 'h ' + m + 'm' : m + 'm';
+  }
+
+  /* ---------- 配置读写 ---------- */
+  function loadCfg(){
+    try {
+      var saved = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
+      var c = {};
+      for (var k in DEFAULTS) c[k] = (k in saved) ? saved[k] : DEFAULTS[k];
+      return c;
+    } catch (e) {
+      return JSON.parse(JSON.stringify(DEFAULTS));
+    }
+  }
+  function saveCfg(cfg){
+    try { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); } catch (e) {}
+  }
+  function loadMarks(){
+    try {
+      var o = JSON.parse(localStorage.getItem(MARK_KEY) || '{}');
+      if (o.date === todayKey() && Array.isArray(o.marks)) return new Set(o.marks);
+    } catch (e) {}
+    return new Set();
+  }
+  function saveMarks(set){
+    try {
+      localStorage.setItem(MARK_KEY, JSON.stringify({
+        date: todayKey(),
+        marks: Array.from(set)
+      }));
+    } catch (e) {}
+  }
+
+  /* ---------- 工作时段计算 ---------- */
+  function getSegments(cfg){
+    var s = toMin(cfg.start), e = toMin(cfg.end);
+    var segs = [[s, e]];
+    if (cfg.useLunch) {
+      var ls = toMin(cfg.lunchStart), le = toMin(cfg.lunchEnd);
+      if (ls > s && le < e && le > ls) segs = [[s, ls], [le, e]];
+    }
+    return segs
+      .filter(function(p){ return p[1] > p[0]; })
+      .map(function(p){ return [p[0] * 60, p[1] * 60]; }); // 转秒
+  }
+
+  /* ---------- 状态 ---------- */
+  var state = {
+    cfg: loadCfg(),
+    marks: loadMarks(),
+    stage: -1,
+    lastQuipAt: 0,
+    primed: false
+  };
+
+  var MOODS = [
+    { until: 0.06, emo: '🌅', lines: ['刚到工位，先接杯水', '电脑还没开，灵魂已上线', '新的一天，从一杯咖啡开始'] },
+    { until: 0.18, emo: '☕', lines: ['上午的咖啡，是续命水', '手指在键盘上，心在周末', '表面冷静，内心在数钱'] },
+    { until: 0.32, emo: '🐟', lines: ['摸鱼中，但钱在悄悄涨', '别问，问就是在思考人生', '认真工作，认真划水'] },
+    { until: 0.46, emo: '🍚', lines: ['干饭倒计时启动', '肚子比脑子先下班', '今天中午吃什么呢'] },
+    { until: 0.60, emo: '😵', lines: ['午后困意上头，撑住', '眼皮正在做剧烈斗争', '靠意志力维持坐姿'] },
+    { until: 0.74, emo: '🚀', lines: ['进度过半，进入冲刺模式', '再撑一下，胜利在望', '开始频繁看表'] },
+    { until: 0.90, emo: '🏃', lines: ['马上解放，准备收包', '椅子已经坐不住了', '心已经飞出办公室'] },
+    { until: 1.01, emo: '🎉', lines: ['下班！今天也是胜利的一天', '钱到手，人自由', '明天的事，明天再说'] }
+  ];
+
+  /* ---------- DOM ---------- */
+  var $ = function(id){ return document.getElementById(id); };
+  var elDate = $('dateText'), elPill = $('pill'), elPillText = $('pillText');
+  var elMoney = $('money'), elPerSec = $('perSec'), elDayPay = $('dayPay');
+  var elEmoji = $('emoji'), elQuip = $('quip');
+  var elBar = $('barFill'), elPct = $('pct'), elLeft = $('leftText');
+  var elCd = $('countdown'), elWorked = $('worked'), elRemainMoney = $('remainMoney');
+  var elCard = $('mainCard');
+
+  /* ---------- 彩带 ---------- */
+  var COLORS = ['#ff6b9d', '#ffd93d', '#6bcb77', '#4d96ff', '#c780ff', '#22d3ee'];
+  function confetti(n){
+    for (var i = 0; i < n; i++) {
+      (function(i){
+        var p = document.createElement('div');
+        p.className = 'confetti';
+        p.style.left = (Math.random() * 100) + 'vw';
+        p.style.background = COLORS[(Math.random() * COLORS.length) | 0];
+        p.style.animationDelay = (Math.random() * 0.35) + 's';
+        p.style.setProperty('--x', (Math.random() * 220 - 110) + 'px');
+        p.style.setProperty('--r', (Math.random() * 900 - 450) + 'deg');
+        document.body.appendChild(p);
+        setTimeout(function(){ p.remove(); }, 2900);
+      })(i);
+    }
+  }
+  function flashCard(){
+    elCard.classList.add('flash');
+    setTimeout(function(){ elCard.classList.remove('flash'); }, 900);
+  }
+
+  /* ---------- 主渲染 ---------- */
+  function render(){
+    var now = new Date();
+    var cfg = state.cfg;
+    var segs = getSegments(cfg);
+
+    if (!segs.length) { elPillText.textContent = '设置有问题'; return; }
+
+    var total = segs.reduce(function(s, p){ return s + (p[1] - p[0]); }, 0);
+    var nowSec = now.getHours() * 3600 + now.getMinutes() * 60 +
+                 now.getSeconds() + now.getMilliseconds() / 1000;
+
+    // 已工作秒数
+    var el = 0;
+    for (var i = 0; i < segs.length; i++) {
+      var a = segs[i][0], b = segs[i][1];
+      if (nowSec > a) el += Math.min(nowSec, b) - a;
+    }
+    el = Math.max(0, Math.min(el, total));
+
+    var prog = total > 0 ? el / total : 0;
+    var dayPay = cfg.salary / Math.max(1, cfg.workDays || 21.75);
+    var money = dayPay * prog;
+    var perSec = total > 0 ? dayPay / total : 0;
+
+    var startSec = segs[0][0];
+    var endSec = segs[segs.length - 1][1];
+    var notStarted = nowSec < startSec;
+    var finished = prog >= 1 - 1e-9;
+
+    /* --- 顶部状态 --- */
+    elPill.className = 'pill';
+    if (notStarted) {
+      elPillText.textContent = '还没开工';
+      elPill.classList.add('off');
+    } else if (finished) {
+      elPillText.textContent = '今日收工';
+      elPill.classList.add('done');
+    } else {
+      elPillText.textContent = '搬砖中';
+    }
+
+    /* --- 金额 --- */
+    elMoney.textContent = fmtMoney(money);
+    elPerSec.textContent = '¥' + perSec.toFixed(4);
+    elDayPay.textContent = '¥' + fmtMoney(dayPay);
+
+    /* --- 进度条 --- */
+    elBar.style.width = (prog * 100).toFixed(2) + '%';
+    elPct.textContent = Math.floor(prog * 100) + '%';
+    elLeft.textContent = finished ? '已下班，去生活吧' :
+      (notStarted ? '还没开始' : '还剩 ' + Math.floor((total - el) / 3600) + '小时' +
+        Math.floor(((total - el) % 3600) / 60) + '分');
+
+    /* --- 三个小卡 --- */
+    if (notStarted) {
+      elCd.textContent = '未开工';
+    } else if (nowSec >= endSec) {
+      elCd.textContent = '已下班';
+    } else {
+      elCd.textContent = hms(endSec - nowSec);
+    }
+    elWorked.textContent = hm(el);
+    elRemainMoney.textContent = '¥' + fmtMoney(Math.max(0, dayPay - money));
+
+    /* --- 情绪文案 --- */
+    var stage = MOODS.findIndex(function(m){ return prog < m.until; });
+    if (stage < 0) stage = MOODS.length - 1;
+
+    var nowTs = Date.now();
+    if (notStarted) {
+      elEmoji.textContent = '🛌';
+      elQuip.textContent = '还没到上班时间，好好享受';
+      state.stage = -2;
+    } else if (finished) {
+      elEmoji.textContent = '🎉';
+      elQuip.textContent = '下班！今天也是胜利的一天';
+      state.stage = -3;
+    } else {
+      if (stage !== state.stage || nowTs - state.lastQuipAt > 12000) {
+        var m = MOODS[stage];
+        elEmoji.textContent = m.emo;
+        elQuip.textContent = m.lines[(Math.random() * m.lines.length) | 0];
+        state.stage = stage;
+        state.lastQuipAt = nowTs;
+      }
+    }
+
+    /* --- 里程碑撒花 --- */
+    [0.25, 0.5, 0.75, 1].forEach(function(mk){
+      if (prog >= mk - 1e-9 && !state.marks.has(mk)) {
+        state.marks.add(mk);
+        saveMarks(state.marks);
+        if (state.primed) {
+          confetti(mk === 1 ? 90 : 45);
+          flashCard();
+        }
+      }
+    });
+    state.primed = true;
+  }
+
+  /* ---------- 日期 ---------- */
+  function renderDate(){
+    var d = new Date();
+    var s = d.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' });
+    if (d.getDay() === 0 || d.getDay() === 6) s += ' ・ 周末也在拼，辛苦啦';
+    elDate.textContent = s;
+  }
+
+  /* ---------- 设置面板 ---------- */
+  var modal = $('modal');
+  var fSalary = $('cfgSalary'), fDays = $('cfgDays'),
+      fStart = $('cfgStart'), fEnd = $('cfgEnd'),
+      fLunch = $('cfgLunch'), fLs = $('cfgLunchStart'), fLe = $('cfgLunchEnd');
+
+  function syncLunchDisabled(){
+    fLs.disabled = !fLunch.checked;
+    fLe.disabled = !fLunch.checked;
+  }
+
+  function openModal(){
+    var c = state.cfg;
+    fSalary.value = c.salary;
+    fDays.value = c.workDays;
+    fStart.value = c.start;
+    fEnd.value = c.end;
+    fLunch.checked = !!c.useLunch;
+    fLs.value = c.lunchStart;
+    fLe.value = c.lunchEnd;
+    syncLunchDisabled();
+    modal.hidden = false;
+  }
+  function closeModal(){ modal.hidden = true; }
+
+  $('gearBtn').addEventListener('click', openModal);
+  $('closeBtn').addEventListener('click', closeModal);
+  modal.addEventListener('click', function(e){ if (e.target === modal) closeModal(); });
+  fLunch.addEventListener('change', syncLunchDisabled);
+
+  $('saveBtn').addEventListener('click', function(){
+    var c = state.cfg;
+    c.salary = Math.max(0, Number(fSalary.value) || 0);
+    c.workDays = Math.min(31, Math.max(1, Number(fDays.value) || 21.75));
+    c.start = fStart.value || '09:00';
+    c.end = fEnd.value || '18:00';
+    c.useLunch = fLunch.checked;
+    c.lunchStart = fLs.value || '12:00';
+    c.lunchEnd = fLe.value || '13:00';
+
+    if (toMin(c.end) <= toMin(c.start)) {
+      alert('下班时间得晚于上班时间哦～');
+      return;
+    }
+    state.cfg = c;
+    saveCfg(c);
+    closeModal();
+    render();
+  });
+
+  /* ---------- 启动 ---------- */
+  renderDate();
+  render();
+  setInterval(render, 100);
+
+})();
+</script>
+</body>
+</html>
